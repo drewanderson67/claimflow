@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#070b14"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Adjudicator">
+<title>ClaimFlow — Real-time Claims Adjudication</title>
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%234f8cff'/%3E%3Cpath d='M18 33l9 9 19-20' stroke='%2306101f' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>/*CSS*/</style></head>
+<body>
+<header class="top">
+ <div class="toprow">
+  <div class="brand"><div class="logo">✓</div><div><h1>ClaimFlow <span class="ver" id="ver"></span></h1><small>Real-time claims adjudication · UnitedHealthcare / Optum (payer ID 87726) · synthetic data</small></div></div>
+  <div class="ctrls">
+   <span class="live" id="live"><span class="dot"></span><span id="liveTxt">Live</span></span>
+   <button class="btn sm" data-act="play" id="playBtn">Pause</button>
+   <select id="speed" title="Claims per second"><option value="1">1 claim/s</option><option value="3">3 /s</option><option value="8">8 /s</option><option value="20">20 /s</option><option value="50">50 /s</option></select>
+   <label class="tog" title="Optum Real: validate claims at the point of care before submission"><input type="checkbox" id="pocTog"><span class="sw"></span><b>Optum Real</b></label>
+   <label class="tog" title="Explain everything in plain English"><input type="checkbox" id="plainTog"><span class="sw"></span><b>Plain English</b></label>
+  </div>
+ </div>
+ <nav class="tabs" id="tabs">
+  <button data-view="live" class="on"><span>◉</span>Live</button>
+  <button data-view="queue"><span>☰</span>Queues <span class="badge" id="qBadge">0</span></button>
+  <button data-view="submit"><span>+</span>Submit</button>
+  <button data-view="appeals"><span>↺</span>Appeals <span class="badge" id="aBadge" style="background:#93c5fd">0</span></button>
+  <button data-view="integrity"><span>⚑</span>Integrity</button>
+  <button data-view="rules"><span>⚙</span>Rules</button>
+  <button data-view="learn"><span>?</span>Learn</button>
+ </nav>
+</header>
+<main>
+ <section class="view on" id="v-live"></section>
+ <section class="view" id="v-queue"></section>
+ <section class="view" id="v-submit"></section>
+ <section class="view" id="v-appeals"></section>
+ <section class="view" id="v-integrity"></section>
+ <section class="view" id="v-rules"></section>
+ <section class="view" id="v-learn"></section>
+</main>
+<div class="scrim" id="scrim" data-act="close"></div>
+<aside class="drawer" id="drawer"><div class="dh" id="dh"></div><div class="db" id="db"></div></aside>
+<div class="modal" id="modal"><div class="box" id="mbox"></div></div>
+<div class="toast" id="toast"></div>
+<script>/*JS*/</script>
+</body></html>
