@@ -15,7 +15,7 @@ async def main():
       await pg.screenshot(path=f'/home/ubuntu/shots/{name}-live.png',full_page=(name=='desk'))
       await pg.click('#pocTog+.sw') if name=='desk' else None
       await pg.wait_for_timeout(4000)
-      for v in ['queue','submit','appeals','integrity','rules','learn']:
+      for v in ['trends','queue','submit','appeals','integrity','rules','learn']:
         await pg.click(f'#tabs button[data-view={v}]');await pg.wait_for_timeout(400)
         sw=await pg.evaluate("document.documentElement.scrollWidth");print(name,v,'scrollWidth',sw)
         await pg.screenshot(path=f'/home/ubuntu/shots/{name}-{v}.png')
@@ -27,7 +27,7 @@ async def main():
       if await pg.locator('.qcard [data-act=deny]').count(): await pg.locator('.qcard [data-act=deny]').first.click()
       # submit presets
       await pg.click('#tabs button[data-view=submit]')
-      for k in ['mri','bundle','termed','tka','oon','clean']:
+      for k in ['mri','bundle','termed','tka','oon','inpt','drgup','clean']:
         await pg.click(f'[data-act=preset][data-k={k}]');await pg.click('[data-act=precheck]');await pg.wait_for_timeout(150)
         print(k,(await pg.inner_text('#pre'))[:140].replace('\n',' | '))
       await pg.click('[data-act=preset][data-k=mri]');await pg.click('[data-act=precheck]');

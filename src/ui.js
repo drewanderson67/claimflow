@@ -38,7 +38,7 @@ function renderLive(){
   const rows=S.claims.slice(0,40);
   $('#feedN').textContent=S.claims.length+' in memory';
   $('#feed').innerHTML='<table><thead><tr><th>Claim</th><th class="hide-m">Received</th><th>Provider</th><th class="hide-m">Member</th><th class="num">Billed</th><th class="num">Paid</th><th>Status</th></tr></thead><tbody>'+
-    rows.map(c=>{const p=prov(c.npi),m=mem(c.mid),r=c.res;return'<tr class="click'+(feedNew.has(c.id)?' new':'')+'" data-act="open" data-id="'+c.id+'"><td class="mono">'+c.id.slice(-8)+'<div class="mut" style="font-size:10px">'+esc(c.channel)+'</div></td><td class="hide-m mono">'+tms(c.rcv)+'</td><td>'+esc(p?p.name:'NPI '+c.npi)+'<div class="mut" style="font-size:11px">'+c.lines.map(l=>l.cpt).join(' ')+'</div></td><td class="hide-m">'+esc(m?m.fn+' '+m.ln[0]+'.':'?')+'<div class="mut" style="font-size:11px">'+(m?m.plan:'')+'</div></td><td class="num">'+money(c.lines.reduce((s,l)=>s+l.chg,0))+'</td><td class="num">'+(r&&FINAL.includes(c.status)?money(r.tot.paid):'—')+'</td><td>'+stB(c.status)+(c.res&&c.res.queue&&c.status==='PENDED'?'<div class="mut" style="font-size:10px">'+esc(c.res.queue)+'</div>':c.res&&c.res.claimDeny?'<div class="mut" style="font-size:10px">CARC '+c.res.claimDeny.carc+'</div>':c.status==='INTERCEPTED'?'<div class="mut" style="font-size:10px">point of care</div>':'')+'</td></tr>'}).join('')+'</tbody></table>'+(rows.length?'':'<div class="empty">Waiting for claims…</div>');
+    rows.map(c=>{const p=prov(c.npi),m=mem(c.mid),r=c.res;return'<tr class="click'+(feedNew.has(c.id)?' new':'')+'" data-act="open" data-id="'+c.id+'"><td class="mono">'+c.id.slice(-8)+'<div class="mut" style="font-size:10px">'+esc(c.channel)+'</div></td><td class="hide-m mono">'+tms(c.rcv)+'</td><td>'+esc(p?p.name:'NPI '+c.npi)+'<div class="mut" style="font-size:11px">'+(c.type==='I'?'837I · DRG '+c.drg+' · '+c.los+'d':c.lines.map(l=>l.cpt).join(' '))+'</div></td><td class="hide-m">'+esc(m?m.fn+' '+m.ln[0]+'.':'?')+'<div class="mut" style="font-size:11px">'+(m?m.plan:'')+'</div></td><td class="num">'+money(c.lines.reduce((s,l)=>s+l.chg,0))+'</td><td class="num">'+(r&&FINAL.includes(c.status)?money(r.tot.paid):'—')+'</td><td>'+stB(c.status)+(c.res&&c.res.queue&&c.status==='PENDED'?'<div class="mut" style="font-size:10px">'+esc(c.res.queue)+'</div>':c.res&&c.res.claimDeny?'<div class="mut" style="font-size:10px">CARC '+c.res.claimDeny.carc+'</div>':c.status==='INTERCEPTED'?'<div class="mut" style="font-size:10px">point of care</div>':'')+'</td></tr>'}).join('')+'</tbody></table>'+(rows.length?'':'<div class="empty">Waiting for claims…</div>');
   feedNew.clear();
   // mix
   const cnt={PAID:0,PARTIAL:0,DENIED:0,PENDED:0,REJECTED:0,INTERCEPTED:0};S.claims.forEach(c=>{if(cnt[c.status]!=null)cnt[c.status]++});
@@ -57,7 +57,7 @@ function drawTP(){const cv=$('#tp');if(!cv)return;const dpr=devicePixelRatio||1,
   d.forEach((x,i)=>{let y=h;const X=(60-d.length+i)*bw+1;[['a','#22c55e'],['p','#a78bfa'],['d','#ef4444'],['i','#22d3ee']].forEach(([k,c])=>{const hh=(x[k]||0)/mx*(h-14);g.fillStyle=c;g.fillRect(X,y-hh,bw-2,hh);y-=hh})});
   g.fillStyle='#8b9abb';g.font='10px sans-serif';g.fillText('max '+mx+'/s',4,11)}
 function csvHref(){const h=['claim_id','icn','received','channel','member_id','plan','npi','provider','dos','cpts','dx','billed','allowed','paid','member_resp','status','queue','carc'];
-  const rows=S.claims.map(c=>{const m=mem(c.mid),p=prov(c.npi),r=c.res||{tot:{}};return[c.id,c.icn,new Date(c.rcv).toISOString(),c.channel,c.mid,m?m.plan:'',c.npi,p?p.name:'',c.dos,c.lines.map(l=>l.cpt).join(' '),c.dx.join(' '),r.tot.chg||0,r.tot.alw||0,r.tot.paid||0,r.tot.mr||0,c.status,r.queue||'',r.claimDeny?r.claimDeny.carc:(r.lines||[]).filter(l=>l.deny).map(l=>l.deny).join(' ')]});
+  const rows=S.claims.map(c=>{const m=mem(c.mid),p=prov(c.npi),r=c.res||{tot:{}};return[c.id,c.icn,new Date(c.rcv).toISOString(),c.channel,c.mid,m?m.plan:'',c.npi,p?p.name:'',c.dos,(c.type==='I'?'DRG '+c.drg+' ':'')+c.lines.map(l=>l.cpt).join(' '),c.dx.join(' '),r.tot.chg||0,r.tot.alw||0,r.tot.paid||0,r.tot.mr||0,c.status,r.queue||'',r.claimDeny?r.claimDeny.carc:(r.lines||[]).filter(l=>l.deny).map(l=>l.deny).join(' ')]});
   return'data:text/csv;charset=utf-8,'+encodeURIComponent([h,...rows].map(r=>r.map(x=>/[",]/.test(String(x))?'"'+String(x).replace(/"/g,'""')+'"':x).join(',')).join('\n'))}
 // ----- Queue -----
 function renderQueue(){
@@ -75,31 +75,36 @@ function qCard(c){const p=prov(c.npi),m=mem(c.mid),k=c.q.key,age=Math.round((Dat
   (c.q.sub==='AWAITING'?'<div class="hint">Waiting on provider… returns in ~'+Math.max(0,Math.round((c.q.until-Date.now())/1000))+'s</div>':
   '<div class="acts"><button class="btn sm ok" data-act="approve" data-id="'+c.id+'">'+(k==='cob'?'Record primary EOB & pay':k==='fraud'?'Release':'Approve')+'</button><button class="btn sm bad" data-act="deny" data-id="'+c.id+'">Deny (CO-'+PEND_DENY[k]+')</button><button class="btn sm" data-act="request" data-id="'+c.id+'">Request '+(k==='cob'?'EOB':k==='fraud'?'records':'info')+'</button><button class="btn sm" data-act="open" data-id="'+c.id+'">Details</button></div>')+'</div>'}
 // ----- Submit -----
-function blankForm(){const m=S.members.find(x=>x.end>iso(today())&&x.plan==='PPO')||S.members[0],p=S.providers[0];return{mid:m.id,npi:p.npi,dos:addDays(iso(today()),-1),pos:'11',auth:'',cob:'',freq:'1',dx:['E11.9','I10'],lines:[{cpt:'99214',mods:'',units:1,chg:220}]}}
+function blankForm(){const m=S.members.find(x=>x.end>iso(today())&&x.plan==='PPO')||S.members[0],p=S.providers[0];return{mid:m.id,npi:p.npi,dos:addDays(iso(today()),-1),pos:'11',auth:'',cob:'',type:'P',freq:'1',dx:['E11.9','I10'],lines:[{cpt:'99214',mods:'',units:1,chg:220}]}}
+function ipForm(drg){const f=blankForm(),h=S.providers.find(p=>p.spec==='HOSP'&&p.net==='IN');f.type='I';if(h)f.npi=h.npi;f.pos='21';f.dx=['J18.9'];f.drg=drg;f.admit=addDays(f.dos,-3);
+  f.lines=[{cpt:'0120',mods:'',units:3,chg:9600},{cpt:'0250',mods:'',units:1,chg:3400},{cpt:'0300',mods:'',units:1,chg:2200},{cpt:'0320',mods:'',units:1,chg:1500}];return f}
+function ipFields(){return'<div class="form" style="margin-top:10px"><label>MS-DRG<select data-f="drg">'+Object.keys(DRG).map(k=>'<option value="'+k+'"'+(F.drg===k?' selected':'')+'>'+k+' · '+esc(DRG[k].d)+'</option>').join('')+'</select></label><label>Admission date<input type="date" data-f="admit" value="'+(F.admit||'')+'"></label><label>Type of bill<input value="111 · inpatient admit-through-discharge" disabled></label></div>'}
 const PRESETS={
  clean:()=>({...blankForm()}),
  mri:()=>{const f=blankForm();f.npi=S.providers.find(p=>p.spec==='RAD').npi;f.pos='22';f.dx=['M54.50'];f.lines=[{cpt:'72148',mods:'',units:1,chg:1450}];return f},
  bundle:()=>{const f=blankForm();f.npi=S.providers.find(p=>p.spec==='GI').npi;f.pos='24';f.dx=['Z12.11'];f.lines=[{cpt:'45380',mods:'',units:1,chg:1900},{cpt:'45378',mods:'',units:1,chg:1600}];return f},
  termed:()=>{const f=blankForm();const m=S.members.find(x=>x.end<iso(today()));if(m){f.mid=m.id;f.dos=addDays(m.end,5)}return f},
  tka:()=>{const f=blankForm();f.npi=S.providers.find(p=>p.spec==='ORTH'&&p.net==='IN').npi;f.pos='22';f.dx=['M17.12'];f.lines=[{cpt:'27447',mods:'',units:1,chg:7800}];const a='A'+ri(10000000,99999999);S.auth[f.mid+'|'+f.dos]=a;f.auth=a;return f},
+ inpt:()=>ipForm('194'),
+ drgup:()=>ipForm('871'),
  oon:()=>{const f=blankForm();const m=S.members.find(x=>x.plan==='HMO'&&x.end>iso(today()));if(m)f.mid=m.id;f.npi=S.providers.find(p=>p.net==='OON').npi;return f}};
-function formClaim(){const c={...newClaimId(),rcv:Date.now(),rcvDate:iso(today()),channel:'Portal',mid:F.mid,npi:F.npi.trim(),dos:F.dos,pos:F.pos,dx:F.dx.filter(Boolean),freq:F.freq,
+function formClaim(){const c={...newClaimId(),rcv:Date.now(),rcvDate:iso(today()),channel:F.type==='I'?'Portal (837I)':'Portal',type:F.type||'P',drg:F.type==='I'?F.drg:null,admit:F.type==='I'?F.admit:null,los:F.type==='I'?Math.max(1,daysBetween(F.admit,F.dos)):0,tob:F.type==='I'?'111':null,mid:F.mid,npi:F.npi.trim(),dos:F.dos,pos:F.pos,dx:F.dx.filter(Boolean),freq:F.freq,
   lines:F.lines.filter(l=>l.cpt).map(l=>({cpt:l.cpt.trim().toUpperCase(),mods:String(l.mods||'').split(/[ ,]+/).filter(Boolean),units:+l.units||1,chg:+l.chg||0})),auth:F.auth||null,cob:F.cob!==''?+F.cob:null,ov:{},seed:Math.random(),hist:[],adj:[]};
   if(c.auth&&!S.auth[c.mid+'|'+c.dos])S.auth[c.mid+'|'+c.dos]=c.auth;return c}
 function renderSubmit(){
   if(!F)F=PRESETS.clean();const mo=S.members.map(m=>'<option value="'+m.id+'"'+(m.id===F.mid?' selected':'')+'>'+esc(m.fn+' '+m.ln)+' · '+m.id+' · '+m.plan+(m.end<iso(today())?' (termed '+m.end+')':'')+(m.other?' · COB':'')+'</option>').join('');
   const po=S.providers.map(p=>'<option value="'+p.npi+'"'+(p.npi===F.npi?' selected':'')+'>'+esc(p.name)+' · '+p.net+'</option>').join('');
-  $('#v-submit').innerHTML='<div class="grid g2"><div class="card"><h2>New claim (837P) <span class="sp"></span>'+Object.entries({clean:'Clean visit',mri:'MRI no auth',bundle:'Bundling',termed:'Termed member',tka:'High-dollar TKA',oon:'HMO out-of-network'}).map(([k,v])=>'<button class="chip" data-act="preset" data-k="'+k+'">'+v+'</button>').join('')+'</h2>'+
+  $('#v-submit').innerHTML='<div class="grid g2"><div class="card"><h2>New claim ('+(F.type==='I'?'837I':'837P')+') <span class="sp"></span>'+Object.entries({clean:'Clean visit',mri:'MRI no auth',bundle:'Bundling',termed:'Termed member',tka:'High-dollar TKA',oon:'HMO out-of-network',inpt:'Hospital stay (837I)',drgup:'DRG upcode (837I)'}).map(([k,v])=>'<button class="chip" data-act="preset" data-k="'+k+'">'+v+'</button>').join('')+'</h2>'+
    '<div class="form"><label>Member (subscriber)<select data-f="mid">'+mo+'</select></label><label>Billing provider<select data-f="npi">'+po+'</select></label>'+
-   '<label>Date of service<input type="date" data-f="dos" value="'+F.dos+'"></label><label>Place of service<select data-f="pos">'+[['11','11 Office'],['22','22 Outpatient hospital'],['23','23 Emergency room'],['24','24 Ambulatory surgery'],['02','02 Telehealth']].map(([v,t])=>'<option value="'+v+'"'+(v===F.pos?' selected':'')+'>'+t+'</option>').join('')+'</select></label>'+
+   '<label>'+(F.type==='I'?'Discharge date':'Date of service')+'<input type="date" data-f="dos" value="'+F.dos+'"></label><label>Place of service<select data-f="pos">'+[['11','11 Office'],['21','21 Inpatient hospital'],['22','22 Outpatient hospital'],['23','23 Emergency room'],['24','24 Ambulatory surgery'],['02','02 Telehealth']].map(([v,t])=>'<option value="'+v+'"'+(v===F.pos?' selected':'')+'>'+t+'</option>').join('')+'</select></label>'+
    '<label>Prior auth # (REF*G1)<input type="text" data-f="auth" value="'+esc(F.auth)+'" placeholder="optional"></label><label>Primary payer paid (COB)<input type="number" step="0.01" data-f="cob" value="'+esc(F.cob)+'" placeholder="if secondary"></label>'+
    '<label>Diagnoses (ICD-10, comma sep)<input type="text" data-f="dx" list="icdl" value="'+esc(F.dx.join(', '))+'"></label><label>Frequency<select data-f="freq"><option value="1">1 Original</option><option value="7"'+(F.freq==='7'?' selected':'')+'>7 Replacement</option></select></label></div>'+
-   '<datalist id="icdl">'+Object.keys(ICD).map(k=>'<option value="'+k+'">'+esc(ICD[k])+'</option>').join('')+'</datalist><datalist id="cptl">'+Object.keys(CPT).map(k=>'<option value="'+k+'">'+esc(CPT[k].d)+'</option>').join('')+'</datalist>'+
-   '<div class="tw" style="margin-top:10px"><table class="lines"><thead><tr><th>#</th><th>CPT/HCPCS</th><th>Modifiers</th><th>Units</th><th>Charge</th><th></th></tr></thead><tbody>'+
+   (F.type==='I'?ipFields():'')+'<datalist id="icdl">'+Object.keys(ICD).map(k=>'<option value="'+k+'">'+esc(ICD[k])+'</option>').join('')+'</datalist><datalist id="cptl">'+Object.keys(CPT).map(k=>'<option value="'+k+'">'+esc(CPT[k].d)+'</option>').join('')+'</datalist>'+
+   '<div class="tw" style="margin-top:10px"><table class="lines"><thead><tr><th>#</th><th>'+(F.type==='I'?'Revenue code':'CPT/HCPCS')+'</th><th>Modifiers</th><th>Units</th><th>Charge</th><th></th></tr></thead><tbody>'+
    F.lines.map((l,i)=>'<tr><td>'+(i+1)+'</td><td><input list="cptl" data-l="'+i+'" data-k="cpt" value="'+esc(l.cpt)+'"><div class="hint">'+esc((CPT[l.cpt]||{}).d||'')+'</div></td><td><input data-l="'+i+'" data-k="mods" value="'+esc(l.mods)+'" placeholder="25, 59"></td><td><input type="number" min="1" data-l="'+i+'" data-k="units" value="'+l.units+'"></td><td><input type="number" step="0.01" data-l="'+i+'" data-k="chg" value="'+l.chg+'"></td><td><button class="btn sm" data-act="rmline" data-i="'+i+'">✕</button></td></tr>').join('')+
    '</tbody></table></div><div class="row" style="margin-top:10px"><button class="btn sm" data-act="addline">+ Line</button><span style="flex:1"></span><button class="btn" data-act="precheck">⚡ Real-time check (Optum Real)</button><button class="btn pri" data-act="submit">Submit claim</button></div></div>'+
    '<div class="grid"><div class="card"><h2>Real-time pre-adjudication</h2><div id="pre">'+(preview||'<div class="hint">Run a real-time check to see the predicted outcome, patient cost estimate and any issues — before the claim is submitted. This is the “shift-left” idea behind Optum Real.</div>')+'</div></div>'+
-   '<div class="card"><h2>Or paste raw X12 837P</h2><textarea id="raw837" class="mono" placeholder="ISA*00*...~"></textarea><div class="row" style="margin-top:8px"><button class="btn sm" data-act="sample837">Load sample</button><button class="btn sm pri" data-act="parse837">Parse & submit</button></div><div class="hint" style="margin-top:6px">Parses NM1*85 (NPI), NM1*IL (member), CLM, REF*G1, HI, SV1 and DTP*472.</div></div></div></div>';
+   '<div class="card"><h2>Or paste raw X12 837P / 837I</h2><textarea id="raw837" class="mono" placeholder="ISA*00*...~"></textarea><div class="row" style="margin-top:8px"><button class="btn sm" data-act="sample837">Load sample</button><button class="btn sm pri" data-act="parse837">Parse & submit</button></div><div class="hint" style="margin-top:6px">Parses NM1*85 (NPI), NM1*IL (member), CLM, REF*G1, HI (incl. HI*DR MS-DRG), SV1/SV2, DTP*472 and DTP*434.</div></div></div></div>';
 }
 const SUGGEST={intake:['Correct the NPI / codes flagged above',null],elig:['Coverage inactive — verify via 270/271, collect new insurance or offer self-pay estimate',null],tf:['Past filing limit — provide proof of timely filing',null],
  auth:['Request prior authorization (278) in real time','fixauth'],bundle:['Remove the bundled component code, or add modifier 59/XS if truly distinct','fixbundle'],mue:['Reduce units to the MUE limit','fixmue'],
@@ -132,7 +137,7 @@ function renderIntegrity(){
    '<div class="card" style="margin-top:14px"><h2>Pre-pay SIU queue</h2>'+(pre.length?'<div class="qgrid">'+pre.slice(0,12).map(qCard).join('')+'</div>':'<div class="hint">No claims in pre-pay review.</div>')+'</div>';
 }
 // ----- Rules -----
-const RULEDEF=[['hd','High-dollar review threshold','Plan payment at/above this amount pends for pre-payment review.','money',[500,10000,100]],['fraud','FWA score threshold','Claims scoring at/above go to SIU / OPRS pre-pay review.','num',[30,99,1]],
+const RULEDEF=[['drgBase','Inpatient DRG base rate','Hospital base rate: 837I payment = base × MS-DRG weight × plan factor × contract (+ cost outlier).','money',[3000,15000,100]],['hdI','Inpatient high-dollar threshold','837I plan payment at/above this pends for pre-payment review.','money',[10000,200000,1000]],['hd','High-dollar review threshold','Plan payment at/above this amount pends for pre-payment review.','money',[500,10000,100]],['fraud','FWA score threshold','Claims scoring at/above go to SIU / OPRS pre-pay review.','num',[30,99,1]],
  ['ncci','NCCI procedure-to-procedure edits','Deny component codes billed with their comprehensive code (CO-97).','bool'],['mue','Medically Unlikely Edits (MUE)','Cap units per line at the CMS MUE (CO-151).','bool'],['dup','Duplicate detection','Deny exact duplicates (member, NPI, DOS, codes) with CO-18.','bool'],
  ['sexEdit','Sex-specific diagnosis edits','Deny when a diagnosis conflicts with patient sex (CO-10).','bool'],['cobPend','Pend for COB','Pend when other coverage is primary and no primary EOB; off = pay and recover later.','bool'],
  ['paMode','Missing prior auth','Deny (CO-197) or pend to clinical review.','sel',['deny','pend']],['mednecMode','Medical-necessity failure','Pend to clinical review (with AI triage) or auto-deny (CO-50).','sel',['pend','deny']],
@@ -169,7 +174,7 @@ function renderDrawer(){const c=S.claims.find(x=>x.id===openId);if(!c){closeDraw
   if(c.status==='PENDED'&&c.q.sub==='READY'){const k=c.q.key;acts='<button class="btn sm ok" data-act="approve" data-id="'+c.id+'">'+(k==='cob'?'Record primary EOB & pay':k==='fraud'?'Release':'Approve')+'</button><button class="btn sm bad" data-act="deny" data-id="'+c.id+'">Deny (CO-'+PEND_DENY[k]+')</button><button class="btn sm" data-act="request" data-id="'+c.id+'">Request info</button>'}
   if(canAppeal(c))acts+='<button class="btn sm" data-act="appeal" data-id="'+c.id+'">File appeal</button>';
   const oa=S.appeals.find(a=>a.cid===c.id&&a.status==='OPEN');if(oa)acts+='<span class="chip">Appeal '+oa.id+' open</span><button class="btn sm ok" data-act="overturn" data-id="'+oa.id+'">Overturn</button><button class="btn sm bad" data-act="uphold" data-id="'+oa.id+'">Uphold</button>';
-  const tabs=[['trace','Trace'],['lines','Lines'],['eob','EOB'],['835',c.status==='REJECTED'?'999':'835 ERA'],['837','837P'],['277','277 status'],['hist','History']];
+  const tabs=[['trace','Trace'],['lines','Lines'],['eob','EOB'],['835',c.status==='REJECTED'?'999':'835 ERA'],['837',c.type==='I'?'837I':'837P'],['277','277 status'],['hist','History']];
   let body='';
   if(dTab==='trace')body=(c.status==='INTERCEPTED'?'<div class="ai" style="margin-bottom:8px">'+esc(c.pocNote)+'</div>':'')+(r?traceHTML(r):'<div class="hint">Not adjudicated.</div>')+(r&&r.fraud?'<p class="hint">FWA score '+r.fraud+(r.fraudWhy&&r.fraudWhy.length?' — '+esc(r.fraudWhy.join('; ')):'')+'</p>':'')+(c.ai?'<div class="ai" style="margin-top:8px"><b>AI clinical review:</b> '+esc(c.ai.rec)+' ('+Math.round(c.ai.conf*100)+'%) — '+esc(c.ai.why)+'</div>':'');
   else if(dTab==='lines')body=r&&r.lines.length?'<div class="tw"><table><thead><tr><th>#</th><th>Code</th><th class="num">Units</th><th class="num">Billed</th><th class="num">Allowed</th><th class="num">Ded</th><th class="num">Copay</th><th class="num">Coins</th><th class="num">Paid</th><th>CAS</th></tr></thead><tbody>'+r.lines.map(l=>'<tr><td>'+(l.i+1)+'</td><td class="mono">'+l.cpt+(l.mods.length?'-'+l.mods.join('-'):'')+'<div class="mut" style="font-size:10px;font-family:inherit">'+esc(CPT[l.cpt].d)+'</div></td><td class="num">'+l.units+(l.payU<l.units?' <span class="bad">→'+l.payU+'</span>':'')+'</td><td class="num">'+money(l.chg)+'</td><td class="num">'+money(l.alw)+'</td><td class="num">'+money(l.ded)+'</td><td class="num">'+money(l.copay)+'</td><td class="num">'+money(l.coins)+'</td><td class="num"><b>'+money(l.paid)+'</b></td><td style="font-size:11px">'+l.cas.map(a=>'<span class="chip" title="'+esc(carcT(a[1]))+'">'+a[0]+'-'+a[1]+' '+money(a[2])+'</span>').join('')+'</td></tr>').join('')+'<tr><td colspan="3"><b>Total</b></td><td class="num">'+money(r.tot.chg)+'</td><td class="num">'+money(r.tot.alw)+'</td><td class="num">'+money(r.tot.ded)+'</td><td class="num">'+money(r.tot.copay)+'</td><td class="num">'+money(r.tot.coins)+'</td><td class="num"><b>'+money(r.tot.paid)+'</b></td><td></td></tr></tbody></table></div>'+(r.cobPrimary!=null?'<p class="hint">Primary payer ('+esc(m.other)+') paid '+money(r.cobPrimary)+'.</p>':'')+(c.adj.length?'<h4>Adjustments</h4>'+c.adj.map(a=>'<div class="issue"><span class="'+(a.delta<0?'bad':'ok')+'">'+money(a.delta)+'</span><span class="mut">'+tms(a.t)+' · '+esc(a.why)+'</span></div>').join(''):''):'<div class="hint">No line pricing (claim rejected at intake).</div>';
@@ -198,7 +203,7 @@ function render(force){const v=S.ui.view;
   $('#qBadge').textContent=pendList().length;$('#aBadge').textContent=S.appeals.filter(a=>a.status==='OPEN').length;
   const act=document.activeElement,typing=act&&/INPUT|SELECT|TEXTAREA/.test(act.tagName)&&$('#v-'+v).contains(act);
   if(v==='live')renderLive();else if(typing&&!force)return;
-  else if(v==='queue')renderQueue();else if(v==='appeals')renderAppeals();else if(v==='integrity')renderIntegrity();
+  else if(v==='trends')renderTrends();else if(v==='queue')renderQueue();else if(v==='appeals')renderAppeals();else if(v==='integrity')renderIntegrity();
   else if(force){if(v==='submit')renderSubmit();if(v==='rules')renderRules();if(v==='learn')renderLearn()}
   if(openId&&(force||!$('#drawer').contains(document.activeElement)))renderDrawer();
 }
@@ -238,7 +243,7 @@ document.addEventListener('click',e=>{const t=e.target.closest('[data-act],[data
     case'submit':{const cc=formClaim();if(S.ui.poc&&pocCheck(cc,false)!=='clean')cc.pocNote='Optum Real flagged issues pre-submission';process(cc,'user');preview=null;renderSubmit();openClaim(cc.id);toast('Submitted '+cc.id+' → '+cc.status);break}
     case'sample837':{const g=genClaim();g.defect=null;$('#raw837').value=gen837(g);break}
     case'parse837':{const x=parse837($('#raw837').value);if(!x.lines.length&&!x.npi){toast('Could not parse 837');break}
-      const cc={...newClaimId(),rcv:Date.now(),rcvDate:iso(today()),channel:'EDI 837P (pasted)',mid:x.mid||'',npi:x.npi||'',dos:x.dos||iso(today()),pos:x.pos||'11',dx:x.dx,freq:x.freq||'1',lines:x.lines.map(l=>({...l,cpt:(l.cpt||'').toUpperCase()})),auth:x.auth||null,cob:null,ov:{},seed:Math.random(),hist:[],adj:[]};
+      const cc={...newClaimId(),rcv:Date.now(),rcvDate:iso(today()),channel:x.type==='I'?'EDI 837I (pasted)':'EDI 837P (pasted)',type:x.type||'P',drg:x.drg||null,pos:x.type==='I'?'21':x.pos,admit:x.admit||null,tob:x.type==='I'?'111':null,los:x.admit&&x.dos?Math.max(1,daysBetween(x.admit,x.dos)):0,mid:x.mid||'',npi:x.npi||'',dos:x.dos||iso(today()),pos:x.pos||'11',dx:x.dx,freq:x.freq||'1',lines:x.lines.map(l=>({...l,cpt:(l.cpt||'').toUpperCase()})),auth:x.auth||null,cob:null,ov:{},seed:Math.random(),hist:[],adj:[]};
       process(cc,'user');openClaim(cc.id);toast('Parsed & submitted → '+cc.status);break}
     case'rulesdef':S.rulelog.unshift({t:Date.now(),k:'all',o:'custom',n:'defaults'});S.rules={...DEFAULT_RULES};renderRules();toast('Defaults restored');break;
   }
@@ -279,3 +284,37 @@ function init(){
   if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 init();
+
+// ---------- Trends ----------
+function renderTrends(){const v=$('#v-trends');
+  if(!v.dataset.init){v.dataset.init=1;const k=(c,t)=>'<i style="background:'+c+'"></i>'+t;
+    v.innerHTML='<div class="grid g2">'+[['tc1','Claims per 10 s',k('#60a5fa','received')+k('#34d399','finalized')+k('#f87171','rejected (999)')],
+      ['tc2','Auto-adjudication & denial rate',k('#34d399','auto-adjudicated')+k('#f87171','denied')+k('#fbbf24','pended on arrival')],
+      ['tc3','Dollars per 10 s',k('#a78bfa','plan paid')+k('#f472b6','hospital (837I) paid')+k('#fbbf24','member responsibility')],
+      ['tc4','Running auto-adjudication rate',k('#22d3ee','auto ÷ finalized (cumulative)')+k('#94a3b8','85% target')]]
+      .map(([id,t,lg])=>'<div class="card"><h2>'+t+'</h2><canvas id="'+id+'" class="tchart"></canvas><div class="lg mut">'+lg+'</div></div>').join('')+
+      '</div><div class="grid g2" style="margin-top:14px"><div class="card"><h2>By plan <span class="sp mut" style="text-transform:none">claims in memory</span></h2><div class="tw" id="tbPlan"></div></div><div class="card"><h2>By claim type</h2><div class="tw" id="tbType"></div></div></div>'}
+  const T=(S.trend||[]).slice(-60),f=k=>T.map(b=>b[k]),pc=(a,b)=>T.map(x=>x[b]?100*x[a]/x[b]:null);
+  let ca=0,cf=0;const cum=T.map(b=>{ca+=b.auto;cf+=b.fin;return cf?100*ca/cf:null});
+  tChart('tc1',[[f('rcv'),'#60a5fa'],[f('fin'),'#34d399'],[f('rej'),'#f87171']],T);
+  tChart('tc2',[[pc('auto','fin'),'#34d399'],[pc('den','fin'),'#f87171'],[pc('pend','rcv'),'#fbbf24']],T,{pct:1});
+  tChart('tc3',[[f('paid'),'#a78bfa'],[f('ipPaid'),'#f472b6'],[f('mr'),'#fbbf24']],T,{money:1});
+  tChart('tc4',[[cum,'#22d3ee'],[T.map(()=>85),'#94a3b8']],T,{pct:1});
+  const grp=key=>{const g={};S.claims.forEach(c=>{const o=g[key(c)]=g[key(c)]||{n:0,fin:0,auto:0,den:0,pend:0,paid:0,chg:0};o.n++;o.chg+=c.lines.reduce((s,l)=>s+l.chg,0);
+    if(c.status==='PENDED')o.pend++;if(c.finalized&&c.res){o.fin++;if(!c.touched)o.auto++;if(c.status==='DENIED')o.den++;o.paid+=c.res.tot.paid}});return g};
+  const pct=(a,b)=>b?Math.round(100*a/b)+'%':'–';
+  const tbl=(g,lab)=>'<table><thead><tr><th>'+lab+'</th><th>Claims</th><th>Auto</th><th>Denied</th><th>Pended</th><th>Billed</th><th>Plan paid</th><th>Paid ÷ billed</th></tr></thead><tbody>'+
+    Object.entries(g).sort((a,b)=>b[1].n-a[1].n).map(([k,o])=>'<tr><td>'+esc(k)+'</td><td>'+o.n+'</td><td>'+pct(o.auto,o.fin)+'</td><td>'+pct(o.den,o.fin)+'</td><td>'+o.pend+'</td><td>'+money(o.chg)+'</td><td>'+money(o.paid)+'</td><td>'+pct(o.paid,o.chg)+'</td></tr>').join('')+'</tbody></table>';
+  $('#tbPlan').innerHTML=tbl(grp(c=>{const m=mem(c.mid);return m?m.plan+' · '+PLANS[m.plan].n:'Unknown member'}),'Plan');
+  $('#tbType').innerHTML=tbl(grp(c=>c.type==='I'?'837I institutional (DRG)':'837P professional'),'Claim type')}
+function tChart(id,series,T,o={}){const cv=$('#'+id);if(!cv)return;const dpr=devicePixelRatio||1,W=cv.clientWidth||300,H=cv.clientHeight||170;cv.width=W*dpr;cv.height=H*dpr;
+  const x=cv.getContext('2d');x.scale(dpr,dpr);const pl=o.money?44:32,pb=16,pt=6,w=W-pl-6,h=H-pb-pt;
+  const mx=o.pct?100:Math.max(1,...series.flatMap(s=>s[0].filter(v=>v!=null)))*1.1;
+  x.font='10px system-ui,sans-serif';x.fillStyle='#8b9bb4';x.strokeStyle='rgba(148,163,184,.15)';x.lineWidth=1;
+  const lab=v=>o.pct?Math.round(v)+'%':o.money?'$'+(v>=1000?(v/1000).toFixed(v>=1e4?0:1)+'k':Math.round(v)):String(Math.round(v));
+  for(let i=0;i<=4;i++){const y=pt+h*i/4;x.beginPath();x.moveTo(pl,y);x.lineTo(pl+w,y);x.stroke();x.fillText(lab(mx*(1-i/4)),2,y+3)}
+  if(!T.length){x.fillText('Waiting for claims…',pl+8,pt+20);return}
+  const fm=t=>new Date(t).toTimeString().slice(0,8),e=fm(T[T.length-1].t);x.fillText(fm(T[0].t),pl,H-3);x.fillText(e,pl+w-x.measureText(e).width,H-3);
+  const n=Math.max(T.length,2);
+  series.forEach(([vals,col])=>{x.strokeStyle=col;x.lineWidth=2;x.beginPath();let on=false;
+    vals.forEach((v,i)=>{if(v==null){on=false;return}const px=pl+w*i/(n-1),py=pt+h*(1-Math.min(v,mx)/mx);on?x.lineTo(px,py):x.moveTo(px,py);on=true});x.stroke()})}
