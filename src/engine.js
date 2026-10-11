@@ -18,7 +18,7 @@ function luhnNPI(base9){const s='80840'+base9;let sum=0,alt=true;for(let i=s.len
 function validNPI(n){return /^\d{10}$/.test(n)&&luhnNPI(n.slice(0,9))===n}
 
 // ---------- State ----------
-const DEFAULT_RULES={hd:2500,fraud:70,ncci:1,mue:1,dup:1,sexEdit:1,mednecMode:'pend',paMode:'deny',cobPend:1,aiAssist:1,aiConf:0.9,examiners:4,autoAppeal:1,tfOverride:0};
+const DEFAULT_RULES={hd:2500,fraud:70,ncci:1,mue:1,dup:1,sexEdit:1,mednecMode:'pend',paMode:'deny',cobPend:1,aiAssist:1,aiConf:0.9,examiners:4,autoAppeal:1,tfOverride:0,drgBase:6800,drgOutlier:42750,hdI:60000};
 let S;
 function seedWorld(){
   R=mulberry(87726);
@@ -35,7 +35,7 @@ function seedWorld(){
     members[i].acc.oop=members[i].acc.ded;
   }
   R=Math.random;
-  return {v:VERSION,rules:{...DEFAULT_RULES},providers,members,claims:[],appeals:[],recov:[],log:[],rulelog:[],auth:{},seq:1,apSeq:1,
+  return {v:VERSION,rules:{...DEFAULT_RULES},providers,members,claims:[],appeals:[],recov:[],log:[],rulelog:[],auth:{},trend:[],seq:1,apSeq:1,
     stats:freshStats(),ui:{plain:false,poc:false,speed:3,running:true}};
 }
 function freshStats(){return{rcv:0,rej:0,fin:0,auto:0,touched:0,paid:0,billed:0,allowed:0,mresp:0,denied:0,partial:0,paidCnt:0,clean:0,poc:0,pocFixed:0,pocBlocked:0,pocSaved:0,
@@ -52,9 +52,9 @@ const STAGES=[
  ['integ','Duplicate & integrity','Is it a repeat bill or suspicious?','Duplicate detection, FWA score, OPRS pre-pay rules'],
  ['price','Pricing','What does the contract pay and what do you owe?','Fee schedule × multiplier, CO-45, deductible/copay/coinsurance, OOP max, COB'],
  ['dec','Decision','Pay, deny, or send to a person','Auto-pay / auto-deny / pend to queue → 835, 277, EOB']];
-const QUEUES={auth:'Clinical – Prior Auth',mednec:'Clinical – Medical Necessity',cob:'COB',fraud:'SIU / Payment Integrity',hd:'High-Dollar Review',info:'Examiner – Missing Info'};
-const PEND_DENY={auth:'197',mednec:'50',cob:'22',fraud:'16',hd:'16',info:'16'};
-const KEY_LABEL={elig:'Eligibility',tf:'Timely filing',oon:'Out of network',medicare:'Non-covered benefit',auth:'No prior auth',sex:'Sex edit',bundle:'NCCI bundling',mue:'MUE units',mednec:'Medical necessity',dup:'Duplicate',cob:'COB',fraud:'Integrity/SIU',hd:'High-dollar'};
+const QUEUES={auth:'Clinical – Prior Auth',mednec:'Clinical – Medical Necessity',cob:'COB',fraud:'SIU / Payment Integrity',hd:'High-Dollar Review',info:'Examiner – Missing Info',drg:'Clinical – DRG Validation'};
+const PEND_DENY={auth:'197',mednec:'50',cob:'22',fraud:'16',hd:'16',info:'16',drg:'150'};
+const KEY_LABEL={drg:'DRG validation',elig:'Eligibility',tf:'Timely filing',oon:'Out of network',medicare:'Non-covered benefit',auth:'No prior auth',sex:'Sex edit',bundle:'NCCI bundling',mue:'MUE units',mednec:'Medical necessity',dup:'Duplicate',cob:'COB',fraud:'Integrity/SIU',hd:'High-dollar'};
 const prov=npi=>S.providers.find(p=>p.npi===npi),mem=id=>S.members.find(m=>m.id===id);
 function log(msg,cls=''){S.log.unshift({t:Date.now(),m:msg,c:cls});if(S.log.length>120)S.log.length=120}
 
@@ -62,20 +62,23 @@ function log(msg,cls=''){S.log.unshift({t:Date.now(),m:msg,c:cls});if(S.log.leng
 function newClaimId(){const n=S.seq++;return{id:'CLM'+String(Date.now()).slice(-6)+String(n).padStart(4,'0'),icn:'87726'+String(26e8+n*37).slice(-9)}}
 function genClaim(){
   const provs=S.providers.filter(p=>p.net!=='TERM');
-  let p=wpick(provs,x=>x.net==='OON'?.35:x.watch?.9:1);
+  let p=wpick(provs,x=>x.spec==='HOSP'?.3:x.net==='OON'?.35:x.watch?.9:1);
   const sc=wpick(SCEN[p.spec],x=>x[0]);
   let pool=S.members.filter(m=>m.end>=addDays(iso(today()),-1));
   if(sc[1].some(l=>l[0]==='G0439'))pool=pool.filter(m=>m.plan==='MA');
+  const drg=sc[3]||null,los=drg?Math.max(1,Math.round(DRG[drg].alos*(.6+R()*.9))):0;
+  if(drg==='807'){const f=pool.filter(m=>m.sex==='F'&&m.plan!=='MA');if(f.length)pool=f}
   const m=pick(pool);
   let dos=addDays(iso(today()),-ri(1,40));
   if(dos>m.end)dos=addDays(m.end,-ri(1,10));
-  const lines=sc[1].map(([cpt,u,mods])=>({cpt,units:u||1,mods:mods?[...mods]:[],chg:0}));
+  const lines=sc[1].map(([cpt,u,mods])=>({cpt,units:CPT[cpt].day?los:(u||1),mods:mods?[...mods]:[],chg:0}));
   if(p.watch&&lines[0]&&/^9921[34]$/.test(lines[0].cpt)&&R()<.7)lines[0].cpt='99215';
-  const c={...newClaimId(),rcv:Date.now(),channel:wpick(['EDI 837P','EDI 837P','EDI 837P','API (FHIR→837)','Portal','Paper (OCR)'],()=>1),
-    mid:m.id,npi:p.npi,dos,pos:p.pos,dx:[...sc[2]],lines,auth:null,cob:null,freq:'1',ov:{},seed:R(),hist:[],adj:[],defect:null,orig:null};
-  if(lines.some(l=>CPT[l.cpt].pa)&&R()<.78){const a='A'+ri(10000000,99999999);c.auth=a;S.auth[m.id+'|'+dos]=a}
+  const c={...newClaimId(),rcv:Date.now(),channel:drg?'EDI 837I':wpick(['EDI 837P','EDI 837P','EDI 837P','API (FHIR→837)','Portal','Paper (OCR)'],()=>1),
+    mid:m.id,npi:p.npi,dos,pos:p.pos,dx:[...sc[2]],lines,auth:null,cob:null,freq:'1',ov:{},seed:R(),hist:[],adj:[],defect:null,orig:null,type:drg?'I':'P',drg,los,admit:drg?addDays(dos,-los):null,tob:drg?'111':null};
+  if((lines.some(l=>CPT[l.cpt].pa)||(drg&&DRG[drg].pa))&&R()<.78){const a='A'+ri(10000000,99999999);c.auth=a;S.auth[m.id+'|'+dos]=a}
   if(m.other&&R()<.55)c.cob=-1; // primary EOB attached (amount filled at pricing estimate)
   injectDefect(c,m,p);
+  if(c.type==='I')c.admit=addDays(c.dos,-c.los);
   c.rcvDate=c.lateDays?addDays(c.dos,c.lateDays):iso(today());
   priceCharges(c);
   return c;
@@ -83,9 +86,10 @@ function genClaim(){
 function priceCharges(c){const p=prov(c.npi);c.lines.forEach(l=>{if(!l.chg){const r=(CPT[l.cpt]||{r:50}).r;l.chg=r2(r*l.units*(p?p.mult:1)*(1.7+R()*1.1))}})}
 const DEFECTS=[['badnpi',.012],['nodx',.01],['baddx',.008],['termed',.025],['late',.018],['bundle',.03],['mue',.02],['mednec',.03],['dup',.03],['sex',.01],['noauth',.02]];
 function injectDefect(c,m,p){
+  if(c.type==='I'&&UPC[c.drg]&&R()<.2){c.defect='drgup';c.orig={npi:c.npi,dx:[...c.dx],lines:JSON.parse(JSON.stringify(c.lines)),mid:c.mid,dos:c.dos,auth:c.auth,drg:c.drg};c.drg=UPC[c.drg];return}
   let r=R(),d=null;for(const [k,w] of DEFECTS){if(r<w){d=k;break}r-=w}
   if(!d)return;c.defect=d;
-  const keep=()=>({npi:c.npi,dx:[...c.dx],lines:JSON.parse(JSON.stringify(c.lines)),mid:c.mid,dos:c.dos,auth:c.auth});
+  const keep=()=>({npi:c.npi,dx:[...c.dx],lines:JSON.parse(JSON.stringify(c.lines)),mid:c.mid,dos:c.dos,auth:c.auth,drg:c.drg});
   c.orig=keep();
   switch(d){
     case'badnpi':c.npi=c.npi.slice(0,9)+((+c.npi[9]+3)%10);break;
@@ -123,7 +127,7 @@ function adjudicate(c,opt={}){
   c.lines.forEach((l,i)=>{if(!CPT[l.cpt])errs.push(['Line '+(i+1)+': invalid CPT/HCPCS '+l.cpt,'SV1'])});
   if(c.dos>iso(today()))errs.push(['Date of service '+c.dos+' is in the future','DTP*472']);
   if(errs.length){errs.forEach(e=>add('intake','fail',e[0]+' ('+e[1]+')'));res.status='REJECTED';res.errs=errs;STAGES.slice(2).forEach(s=>add(s[0],'skip','Not processed — front-end rejection'));res.ms=performance.now()-t0;return res}
-  add('intake','pass','999 accepted · 277CA A1:20 · '+c.channel+' · '+c.lines.length+' line(s)');
+  add('intake','pass','999 accepted · 277CA A1:20 · '+c.channel+' · '+c.lines.length+' line(s)'+(c.type==='I'?' · 837I TOB '+c.tob+' · MS-DRG '+c.drg+' · stay '+c.admit+' → '+c.dos:''));
   const L=c.lines.map((l,i)=>({i,cpt:l.cpt,mods:l.mods||[],units:l.units,chg:l.chg,payU:l.units,deny:null,denyKey:null,pendKey:null,cas:[],alw:0,ded:0,copay:0,coins:0,cob:0,paid:0,mr:0,note:''}));
   res.lines=L;
   const lineDeny=(l,carc,key,msg)=>{if(l.deny)return;l.deny=carc;l.denyKey=key;l.note=msg;if(!res.denyKeys.includes(key))res.denyKeys.push(key)};
@@ -149,6 +153,13 @@ function adjudicate(c,opt={}){
   if(stop())add('ben','skip','Skipped');
   else{
     let any=false;
+    if(c.type==='I'&&DRG[c.drg]){any=true;const D=DRG[c.drg],a=S.auth[c.mid+'|'+c.dos];
+      if(!D.pa)add('ben','pass','Inpatient admission notification on file · MS-DRG '+c.drg+' covered under inpatient benefit');
+      else if(a&&(!c.auth||c.auth===a))add('ben','pass','Elective admission (MS-DRG '+c.drg+'): prior auth '+a+' approved (278)');
+      else if(dby('auth'))add('ben','warn','Admission retro-authorized by clinical review');
+      else if(rl.paMode==='pend'&&!pby('auth')){pend('auth','No inpatient prior auth for MS-DRG '+c.drg,L);add('ben','pend','Elective admission MS-DRG '+c.drg+' without prior auth → pend to Clinical review')}
+      else if(!pby('auth')||rl.paMode!=='pend'){L.forEach(l=>lineDeny(l,'197','auth','Inpatient prior authorization required and not on file'));add('ben','fail','Elective admission MS-DRG '+c.drg+' requires prior auth; none on file → CO-197')}
+      else add('ben','warn','Admission released by clinical reviewer')}
     L.forEach(l=>{const d=CPT[l.cpt];
       if(d.medicare&&!P.medicare&&!dby('medicare')){lineDeny(l,'204','medicare',l.cpt+' is a Medicare-only benefit');add('ben','fail','Line '+(l.i+1)+' '+l.cpt+': not a benefit of '+m.plan+' → CO-204');any=true}
       if(d.pa){any=true;const a=S.auth[c.mid+'|'+c.dos];
@@ -176,11 +187,21 @@ function adjudicate(c,opt={}){
         if(mod===1&&hasMod)add('code','pass','NCCI '+a+'/'+b+': modifier '+(lb.mods.concat(la.mods).join(','))+' bypasses edit');
         else if(!dby('bundle')){lineDeny(lb,'97','bundle',b+' bundled into '+a);add('code','fail','NCCI PTP: '+b+' is a component of '+a+(mod===1?' (no 59/XS/25 modifier)':' (modifier not allowed)')+' → CO-97');issues++}}});
     if(rl.mue&&!stop())L.forEach(l=>{const mx=CPT[l.cpt].mue;if(mx&&l.units>mx&&!l.deny){if(dby('mue'))add('code','warn','MUE exceeded but override applied');else{l.payU=mx;add('code','fail','MUE: '+l.cpt+' billed '+l.units+' units, max '+mx+' → excess '+(l.units-mx)+' unit(s) CO-151');if(!res.denyKeys.includes('mue'))res.denyKeys.push('mue');issues++}}});
-    if(!issues)add('code','pass','CPT/HCPCS + ICD-10 valid; no NCCI, MUE or sex/age conflicts');
+    if(!issues)add('code','pass',c.type==='I'?'Revenue codes + ICD-10 valid; MS-DRG grouper inputs complete; no sex/age conflicts':'CPT/HCPCS + ICD-10 valid; no NCCI, MUE or sex/age conflicts');
   }
   // 7 medical necessity
   if(stop())add('mednec','skip','Skipped');
   else{let chk=0;
+    if(c.type==='I'&&DRG[c.drg]){chk++;const D=DRG[c.drg],pdx=c.dx[0]||'',ok=D.dx.some(x=>pdx.startsWith(x));
+      const gd=Object.keys(DRG).filter(k=>DRG[k].dx.some(x=>pdx.startsWith(x))).sort((a,b)=>DRG[b].w-DRG[a].w)[0];
+      const regroup=()=>{if(gd){res.regroup={from:c.drg,to:gd};res.denyKeys.push('drg');add('mednec','fail','DRG validation: principal dx '+pdx+' groups to MS-DRG '+gd+' ('+DRG[gd].d+'), not '+c.drg+' → regrouped, CO-150')}
+        else{L.forEach(l=>lineDeny(l,'50','drg','Principal diagnosis does not support an inpatient MS-DRG'));add('mednec','fail','DRG validation: '+pdx+' supports no inpatient MS-DRG → CO-50')}};
+      if(ok)add('mednec','pass','DRG validation: principal dx '+pdx+' supports MS-DRG '+c.drg+' ('+D.d+')');
+      else if(dby('drg'))add('mednec','warn','DRG validation: MS-DRG '+c.drg+' upheld on clinical coding review/appeal');
+      else if(c.forceDeny&&c.forceDeny.key==='drg')regroup();
+      else if(rl.mednecMode==='pend'&&!pby('drg')){pend('drg','Principal dx '+pdx+' does not support MS-DRG '+c.drg+' ('+D.d+')',L);add('mednec','pend','DRG validation: '+pdx+' does not support MS-DRG '+c.drg+' → pend to clinical coding review')}
+      else if(!pby('drg'))regroup();
+      else add('mednec','warn','MS-DRG '+c.drg+' released by reviewer')}
     L.forEach(l=>{const pf=MEDNEC[l.cpt];if(!pf||l.deny)return;chk++;
       const ok=c.dx.some(d=>pf.some(x=>d.startsWith(x)));
       if(ok)add('mednec','pass',l.cpt+' supported by '+c.dx.filter(d=>pf.some(x=>d.startsWith(x))).join(', '));
@@ -215,8 +236,9 @@ function adjudicate(c,opt={}){
   else{
     const useOON=oon&&P.oon,ded=useOON?P.oon.ded:P.ded,coins=useOON?P.oon.coins:P.coins;
     let remDed=Math.max(0,ded-m.acc.ded),remOop=Math.max(0,P.oop-m.acc.oop),copayUsed=false;
-    if(c.forceDeny&&c.forceDeny.key!=='mednec'){const k=c.forceDeny.key;const tl=L.filter(l=>l.pendKey===k);(tl.length?tl:L).forEach(l=>lineDeny(l,PEND_DENY[k],k,'Denied by '+QUEUES[k]))}
-    L.forEach(l=>{const d=CPT[l.cpt];
+    if(c.forceDeny&&!['mednec','drg'].includes(c.forceDeny.key)){const k=c.forceDeny.key;const tl=L.filter(l=>l.pendKey===k);(tl.length?tl:L).forEach(l=>lineDeny(l,PEND_DENY[k],k,'Denied by '+QUEUES[k]))}
+    if(c.type==='I')remDed=priceDRG(c,res,L,P,p,useOON,remDed,remOop,coins,add,lineDeny);
+    else L.forEach(l=>{const d=CPT[l.cpt];
       if(l.deny){l.cas=[['CO',l.deny,l.chg]];return}
       const unitChg=l.chg/l.units,pay=l.payU;
       const base=d.r*pay*(useOON?P.oon.mult:p.mult);
@@ -248,7 +270,8 @@ function adjudicate(c,opt={}){
     const paidT=L.reduce((s,l)=>s+l.paid,0);
     add('price','pass','Allowed '+money(alw)+' ('+(useOON?'OON '+P.oon.mult+'× fee schedule':'contract × '+p.mult)+') · plan pays '+money(paidT)+' · member '+money(L.reduce((s,l)=>s+l.mr,0))+' · ded remaining '+money(Math.max(0,remDed)));
     // high dollar
-    if(!res.pend&&paidT>=rl.hd&&!pby('hd')){pend('hd','Plan payment '+money(paidT)+' ≥ '+money(rl.hd)+' high-dollar threshold');add('price','pend','High-dollar: '+money(paidT)+' ≥ '+money(rl.hd)+' → pend for pre-payment review')}
+    const hdT=c.type==='I'?rl.hdI:rl.hd;
+    if(!res.pend&&paidT>=hdT&&!pby('hd')){pend('hd','Plan payment '+money(paidT)+' ≥ '+money(hdT)+' high-dollar threshold');add('price','pend','High-dollar: '+money(paidT)+' ≥ '+money(hdT)+' → pend for pre-payment review')}
   }
   // totals
   L.forEach(l=>{res.tot.chg+=l.chg;res.tot.alw+=l.alw;res.tot.paid+=l.paid;res.tot.mr+=l.mr;res.tot.ded+=l.ded;res.tot.copay+=l.copay;res.tot.coins+=l.coins;res.tot.cob+=l.cob});
@@ -256,8 +279,31 @@ function adjudicate(c,opt={}){
   // 10 decision
   if(res.claimDeny){res.status='DENIED';add('dec','fail','Auto-denied: CARC '+res.claimDeny.carc+' — '+CARC[res.claimDeny.carc][0])}
   else if(res.pend&&!c.forceDeny){res.status='PENDED';res.queue=QUEUES[res.pend.key];add('dec','pend','Pended → '+res.queue+': '+res.pend.msg)}
-  else{const dn=L.filter(l=>l.deny||l.payU<l.units).length;res.status=L.every(l=>l.deny)?'DENIED':dn?'PARTIAL':'PAID';
+  else{const dn=L.filter(l=>l.deny||l.payU<l.units).length;res.status=L.every(l=>l.deny)?'DENIED':dn||res.regroup?'PARTIAL':'PAID';
     add('dec',res.status==='PAID'?'pass':res.status==='DENIED'?'fail':'warn',(c.touched?'Finalized after review: ':'Auto-adjudicated: ')+res.status+' · pay '+money(res.tot.paid)+' via '+(res.tot.paid>0?'EFT':'$0 835'))}
   res.ms=performance.now()-t0;
   return res;
 }
+
+// Inpatient (837I) case-rate pricing: base rate × MS-DRG weight × plan factor × contract, + cost outlier, lesser of charges
+function priceDRG(c,res,L,P,p,useOON,remDed,remOop,coins,add,lineDeny){
+  const rl=S.rules,code=(res.regroup&&res.regroup.to)||c.drg,D=DRG[code];
+  if(!D)L.forEach(l=>{if(!l.deny)lineDeny(l,'16','info','Missing or invalid MS-DRG')});
+  L.forEach(l=>{if(l.deny)l.cas=[['CO',l.deny,l.chg]]});
+  const live=L.filter(l=>!l.deny);if(!live.length||!D)return remDed;
+  const chg=r2(live.reduce((s,l)=>s+l.chg,0)),f=(P.ipF||1)*(useOON?P.oon.mult:p.mult),pay=w=>r2(rl.drgBase*w*f);
+  const base=pay(D.w),billed=res.regroup&&DRG[res.regroup.from]?pay(DRG[res.regroup.from].w):base;
+  const cost=chg*.3,thr=base+rl.drgOutlier,out=cost>thr?r2((cost-thr)*.8):0,alw=r2(Math.min(chg,base+out));
+  let dd=0,cp=0,co=0;
+  if(!useOON&&P.copay.IP)cp=Math.min(P.copay.IP,alw);else{dd=r2(Math.min(remDed,alw));remDed-=dd;co=r2((alw-dd)*coins)}
+  let sh=dd+cp+co;if(sh>remOop){let cut=sh-remOop;const a=Math.min(cut,co);co=r2(co-a);cut-=a;const b=Math.min(cut,cp);cp=r2(cp-b);cut-=b;dd=r2(dd-cut)}
+  const acc={alw:0,ded:0,copay:0,coins:0},diff=Math.max(0,billed-base);
+  live.forEach((l,i)=>{const last=i===live.length-1,w=l.chg/chg;
+    for(const [k,v] of [['alw',alw],['ded',dd],['copay',cp],['coins',co]]){l[k]=last?r2(v-acc[k]):r2(v*w);acc[k]+=l[k]}
+    l.mr=r2(l.ded+l.copay+l.coins);l.paid=r2(l.alw-l.mr);
+    const wo=r2(l.chg-l.alw),dg=diff?Math.min(wo,r2(diff*w)):0;
+    if(dg>0)l.cas.push(['CO','150',dg]);if(wo-dg>0)l.cas.push(['CO','45',r2(wo-dg)]);
+    if(l.ded)l.cas.push(['PR','1',l.ded]);if(l.copay)l.cas.push(['PR','3',l.copay]);if(l.coins)l.cas.push(['PR','2',l.coins]);
+    if(i===0)l.note='MS-DRG '+code+' case rate (allocated by charge)'});
+  add('price','pass','MS-DRG '+code+' '+D.d+' · weight '+D.w.toFixed(2)+' × base '+money(rl.drgBase)+' × '+f.toFixed(2)+(useOON?' (OON)':' (plan × contract)')+' = '+money(base)+(out?' + cost outlier '+money(out):'')+(alw<base+out?' · capped at billed charges':'')+(diff?' · regrouped from '+res.regroup.from+' (−'+money(diff)+', CO-150)':''));
+  return remDed}

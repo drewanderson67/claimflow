@@ -1,6 +1,11 @@
 // ---------- Reference data (synthetic, for simulation) ----------
-const VERSION='1.0.0';
+const VERSION='1.1.0';
 const CPT={
+'0120':{d:'Room & board – semi-private (per day)',r:900,cat:'IP',rev:1,day:1},'0114':{d:'Room & board – psychiatric (per day)',r:800,cat:'IP',rev:1,day:1},
+'0200':{d:'Intensive care unit (per day)',r:2600,cat:'IP',rev:1},'0250':{d:'Pharmacy',r:450,cat:'IP',rev:1},'0270':{d:'Medical/surgical supplies',r:500,cat:'IP',rev:1},
+'0278':{d:'Implants',r:2600,cat:'IP',rev:1},'0300':{d:'Laboratory',r:220,cat:'IP',rev:1},'0320':{d:'Radiology – diagnostic',r:260,cat:'IP',rev:1},
+'0360':{d:'Operating room services',r:2100,cat:'IP',rev:1},'0370':{d:'Anesthesia',r:600,cat:'IP',rev:1},'0420':{d:'Physical therapy',r:150,cat:'IP',rev:1},
+'0450':{d:'Emergency room',r:700,cat:'IP',rev:1},'0481':{d:'Cardiac catheterization lab',r:2800,cat:'IP',rev:1},'0720':{d:'Labor & delivery room',r:1400,cat:'IP',rev:1},
 '99202':{d:'Office visit, new pt, straightforward',r:72,cat:'EM'},
 '99203':{d:'Office visit, new pt, low MDM',r:110,cat:'EM'},
 '99204':{d:'Office visit, new pt, moderate MDM',r:165,cat:'EM'},
@@ -42,14 +47,14 @@ const CPT={
 const ICD={
 'Z00.00':'General adult exam w/o abnormal findings','Z12.11':'Screening for malignant neoplasm of colon','E11.9':'Type 2 diabetes w/o complications',
 'E11.65':'Type 2 diabetes w/ hyperglycemia','I10':'Essential hypertension','E78.5':'Hyperlipidemia, unspecified','J06.9':'Acute upper respiratory infection',
-'J18.9':'Pneumonia, unspecified','R07.9':'Chest pain, unspecified','R10.9':'Unspecified abdominal pain','M54.50':'Low back pain, unspecified',
+'J18.9':'Pneumonia, unspecified','A41.9':'Sepsis, unspecified organism','I50.23':'Acute on chronic systolic heart failure','K52.9':'Noninfective gastroenteritis and colitis','O80':'Encounter for full-term uncomplicated delivery','F33.2':'Major depressive disorder, recurrent, severe','I21.4':'Non-ST elevation myocardial infarction (NSTEMI)','M16.11':'Primary osteoarthritis, right hip','J44.1':'COPD with acute exacerbation','R07.9':'Chest pain, unspecified','R10.9':'Unspecified abdominal pain','M54.50':'Low back pain, unspecified',
 'M51.26':'Intervertebral disc displacement, lumbar','M17.11':'Primary osteoarthritis, right knee','M17.12':'Primary osteoarthritis, left knee',
 'S83.241A':'Medial meniscus tear, right knee, initial','M25.561':'Pain in right knee','R51.9':'Headache, unspecified','G43.909':'Migraine, unspecified',
 'K21.9':'GERD without esophagitis','K92.1':'Melena','F41.1':'Generalized anxiety disorder','F32.1':'Major depressive disorder, moderate',
 'M05.79':'Rheumatoid arthritis w/ RF, multiple sites','L40.50':'Arthropathic psoriasis','N40.0':'Benign prostatic hyperplasia (male)',
 'O09.90':'Supervision of high-risk pregnancy (female)','S93.401A':'Sprain of right ankle, initial'
 };
-const SEXDX={'N40.0':'M','O09.90':'F'};
+const SEXDX={'N40.0':'M','O09.90':'F','O80':'F'};
 // medical-necessity: CPT -> allowed ICD prefixes
 const MEDNEC={'73721':['M17','S83','M25.56'],'72148':['M54','M51'],'70553':['R51','G43'],'74177':['R10','K92'],'29881':['S83','M17'],
 '27447':['M17'],'45380':['Z12','K92','R10'],'45378':['Z12','K92','R10'],'43239':['K21','K92','R10'],'43235':['K21','K92','R10'],'J0135':['M05','L40'],
@@ -61,6 +66,7 @@ const CARC={
 '4':['Procedure code inconsistent with modifier / missing modifier','The billing code was missing a required modifier'],
 '7':['Procedure inconsistent with patient sex','Service doesn\'t match patient sex on file'],
 '10':['Diagnosis inconsistent with patient gender','Diagnosis doesn\'t match patient sex on file'],
+'150':['Payer deems the information submitted does not support this level of service','The records didn\'t support how serious the hospital stay was billed as'],
 '16':['Claim lacks information needed for adjudication','More information is needed from your provider'],
 '18':['Exact duplicate claim/service','This bill was already received'],
 '22':['May be covered by another payer per COB','Another insurance may need to pay first'],
@@ -78,20 +84,21 @@ const CARC={
 'B13':['Previously paid','Already paid on an earlier claim']
 };
 const PLANS={
-'PPO':{n:'UHC Choice Plus PPO',ded:1500,oop:6000,coins:.2,copay:{EM:30,ER:300,BH:30},oon:{ded:3000,coins:.4,mult:1.4},tf:90},
-'HMO':{n:'UHC Navigate HMO',ded:500,oop:4500,coins:.1,copay:{EM:20,ER:250,BH:20},oon:null,tf:90},
-'HDHP':{n:'UHC Choice Plus HSA (HDHP)',ded:3200,oop:7000,coins:.1,copay:{},oon:{ded:6400,coins:.3,mult:1.4},tf:90},
-'MA':{n:'AARP Medicare Advantage HMO-POS',ded:0,oop:3900,coins:.2,copay:{EM:10,ER:90,BH:10},oon:{ded:0,coins:.4,mult:1.0},tf:365,medicare:1},
-'EPO':{n:'Optum Care Network (delegated, 87726)',ded:750,oop:5000,coins:.15,copay:{EM:25,ER:250,BH:25},oon:null,tf:90,delegated:1}
+'PPO':{ipF:1.8,n:'UHC Choice Plus PPO',ded:1500,oop:6000,coins:.2,copay:{EM:30,ER:300,BH:30},oon:{ded:3000,coins:.4,mult:1.4},tf:90},
+'HMO':{ipF:1.6,n:'UHC Navigate HMO',ded:500,oop:4500,coins:.1,copay:{EM:20,ER:250,BH:20,IP:250},oon:null,tf:90},
+'HDHP':{ipF:1.8,n:'UHC Choice Plus HSA (HDHP)',ded:3200,oop:7000,coins:.1,copay:{},oon:{ded:6400,coins:.3,mult:1.4},tf:90},
+'MA':{ipF:1.0,n:'AARP Medicare Advantage HMO-POS',ded:0,oop:3900,coins:.2,copay:{EM:10,ER:90,BH:10,IP:350},oon:{ded:0,coins:.4,mult:1.0},tf:365,medicare:1},
+'EPO':{ipF:1.5,n:'Optum Care Network (delegated, 87726)',ded:750,oop:5000,coins:.15,copay:{EM:25,ER:250,BH:25},oon:null,tf:90,delegated:1}
 };
-const SPEC={FM:'Family Medicine',IM:'Internal Medicine',ORTH:'Orthopedics',GI:'Gastroenterology',RAD:'Radiology',ED:'Emergency Medicine',PT:'Physical Therapy',BH:'Behavioral Health',RHEUM:'Rheumatology',NEURO:'Neurology',CARD:'Cardiology'};
+const SPEC={HOSP:'Acute-care hospital (837I)',FM:'Family Medicine',IM:'Internal Medicine',ORTH:'Orthopedics',GI:'Gastroenterology',RAD:'Radiology',ED:'Emergency Medicine',PT:'Physical Therapy',BH:'Behavioral Health',RHEUM:'Rheumatology',NEURO:'Neurology',CARD:'Cardiology'};
 const PROVSEED=[
 ['Allina Health Clinic – Uptown','FM','IN',1.00,'11'],['Maple Grove Internal Medicine','IM','IN',1.05,'11'],['Twin Cities Orthopedics','ORTH','IN',1.15,'11'],
 ['Minnesota GI Associates','GI','IN',1.10,'24'],['Center for Diagnostic Imaging','RAD','IN',1.08,'22'],['Abbott Northwestern ED Physicians','ED','IN',1.20,'23'],
 ['Core Motion Physical Therapy','PT','IN',0.95,'11'],['Lakeside Behavioral Health','BH','IN',1.00,'11'],['North Star Rheumatology','RHEUM','IN',1.10,'11'],
 ['Summit Neurology Partners','NEURO','IN',1.12,'11'],['Midwest Heart & Vascular','CARD','IN',1.10,'11'],['Optum Care – Edina','FM','IN',1.00,'11'],
 ['Prestige Concierge Medicine','IM','OON',1.00,'11'],['Elite Spine & Pain Institute','ORTH','OON',1.00,'11'],['QuickCare Wellness LLC','FM','IN',1.00,'11',1],
-['Riverbend Family Practice (termed)','FM','TERM',1.00,'11']
+['Riverbend Family Practice (termed)','FM','TERM',1.00,'11'],
+['Abbott Northwestern Hospital','HOSP','IN',1.00,'21'],['Mercy Hospital – Coon Rapids','HOSP','IN',0.95,'21'],['Lakeview Regional Medical Center','HOSP','OON',1.00,'21']
 ];
 const SCEN={ // specialty -> encounter templates [weight, lines[[cpt,units,mods]], dx[]]
 FM:[[5,[['99213'],['36415'],['83036']],['E11.9','I10']],[4,[['99214'],['80053'],['36415']],['E11.65','E78.5']],[3,[['99395']],['Z00.00']],[2,[['99396'],['85025'],['36415']],['Z00.00']],[3,[['99213']],['J06.9']],[1,[['99203']],['R51.9']]],
@@ -104,7 +111,10 @@ PT:[[5,[['97110',3],['97140',2]],['M54.50']],[3,[['97110',2],['97140',2]],['M17.
 BH:[[5,[['90834']],['F41.1']],[4,[['90837']],['F32.1']]],
 RHEUM:[[3,[['99214'],['J0135',2]],['M05.79']],[2,[['99213'],['85025']],['L40.50']]],
 NEURO:[[3,[['99204']],['G43.909']],[2,[['99214'],['70553']],['R51.9']]],
-CARD:[[4,[['99214'],['93000']],['I10']],[2,[['99215'],['93000']],['R07.9']]]
+CARD:[[4,[['99214'],['93000']],['I10']],[2,[['99215'],['93000']],['R07.9']]],
+HOSP:[[3,[['0120'],['0250'],['0300'],['0320']],['J18.9'],'194'],[1,[['0120'],['0200',2],['0250'],['0300']],['J18.9','J44.1'],'193'],[2,[['0120'],['0200',2],['0250'],['0300'],['0450']],['A41.9','J18.9'],'871'],
+ [2,[['0120'],['0250'],['0300'],['0320']],['I50.23','I10'],'291'],[2,[['0120'],['0360'],['0370'],['0278'],['0270'],['0420']],['M17.11'],'470'],[2,[['0120'],['0720'],['0250'],['0300']],['O80'],'807'],
+ [1,[['0114'],['0250']],['F33.2'],'885'],[1,[['0120'],['0481'],['0278'],['0250']],['I21.4','I10'],'247'],[2,[['0120'],['0250'],['0300']],['K52.9'],'392'],[1,[['0120'],['0200'],['0250'],['0300']],['J44.1'],'190']]
 };
 const FIRST=['James','Mary','Robert','Patricia','John','Jennifer','Michael','Linda','David','Elizabeth','William','Barbara','Richard','Susan','Joseph','Jessica','Thomas','Sarah','Carlos','Maria','Wei','Aisha','Omar','Priya','Ethan','Olivia','Noah','Emma','Liam','Sofia','Hmong','Ingrid','Lars','Fatima','Diego','Grace'];
 const LAST=['Johnson','Nguyen','Smith','Garcia','Olson','Anderson','Hansen','Lee','Patel','Martinez','Larson','Brown','Davis','Kim','Thao','Lopez','Miller','Wilson','Peterson','Ahmed','Clark','Lewis','Young','Walker','Hall','Allen'];
@@ -113,7 +123,7 @@ const PEOPLE=[['Providers / billing & revenue-cycle teams','Document, code and s
 ['Clinical reviewers / medical directors','Medical-necessity and prior-auth determinations.'],['Payment integrity / SIU','Pre-pay review (OPRS), post-pay data mining, overpayment recovery, FWA.'],
 ['Appeals teams','Reconsiderations and appeals; overturn or uphold with rationale.'],['IT / data / rules configuration','Benefit config, fee schedules, edit libraries, rule changes.'],
 ['Compliance / regulatory','Timeliness (prompt-pay), CMS/state rules, audit trails.'],['Finance / accounting','EFT/check runs, 835 posting, recoveries and accruals.'],['Members','Receive EOBs, owe cost-share, may appeal.']];
-const SYSTEMS=[['EDI gateway / clearinghouse','X12 837P/837I in; 999, 277CA, 277, 835 out.'],['Core claims engine + rules engine','Layered edits, pricing, decisioning (this app\'s pipeline).'],
+const SYSTEMS=[['MS-DRG grouper & inpatient pricer','837I hospital stays are grouped to an MS-DRG; payment = hospital base rate × DRG relative weight (+ cost outlier). DRG validation audits that the principal diagnosis supports the DRG billed.'],['EDI gateway / clearinghouse','X12 837P/837I in; 999, 277CA, 277, 835 out.'],['Core claims engine + rules engine','Layered edits, pricing, decisioning (this app\'s pipeline).'],
 ['Eligibility & enrollment','Coverage spans, plan, accumulators (270/271).'],['Provider contract / fee-schedule DB','Network status, rates, multipliers.'],
 ['Medical policy / clinical decision support','Medical-necessity criteria, prior-auth (278).'],['Optum Claims Manager / OPRS','Code-edit library; prepayment review system.'],
 ['Optum Real','Real-time, point-of-care coverage + issue interception (shift-left).'],['Provider portal / APIs','UHC Provider Portal: submission, status, appeals.'],['Data warehouse / analytics','Integrity mining, reporting, KPIs.']];
@@ -126,3 +136,18 @@ const LIFECYCLE=[
 ['Adjudication decision','Pay automatically, deny, or send to a person to review.','Auto-approve / auto-deny / pend to examiner, clinical, SIU, COB or high-dollar queues.','Stage 10 · Queue tab'],
 ['Payment, remittance & reporting','The doctor gets paid and you get an Explanation of Benefits.','835 ERA + EFT/check, EOB, 277 status, financial posting.','Claim drawer · EOB / 835 / 277'],
 ['Post-adjudication','Appeals, corrections and audits after the fact.','Reconsiderations/appeals, adjustments, overpayment recovery, post-pay mining.','Appeals & Integrity tabs']];
+
+// MS-DRG (synthetic subset; weights approximate CMS FY tables). dx = principal-dx prefixes that group to the DRG
+const DRG={
+'470':{d:'Major hip & knee joint replacement w/o MCC',w:1.91,alos:2,dx:['M16','M17'],pa:1},
+'193':{d:'Simple pneumonia & pleurisy w MCC',w:1.30,alos:4.5,dx:['J18']},
+'194':{d:'Simple pneumonia & pleurisy w CC',w:0.89,alos:3.4,dx:['J18']},
+'871':{d:'Septicemia w/o MV >96 hrs w MCC',w:1.93,alos:4.9,dx:['A41']},
+'291':{d:'Heart failure & shock w MCC',w:1.34,alos:4.3,dx:['I50']},
+'190':{d:'COPD w MCC',w:1.17,alos:3.9,dx:['J44']},
+'392':{d:'Esophagitis, gastroent & misc digestive disorders w/o MCC',w:0.78,alos:2.8,dx:['K52','K21','R10']},
+'807':{d:'Vaginal delivery w/o sterilization/D&C w/o CC/MCC',w:0.60,alos:2,dx:['O80']},
+'885':{d:'Psychoses',w:1.33,alos:6.5,dx:['F32','F33']},
+'247':{d:'Perc cardiovasc proc w drug-eluting stent w/o MCC',w:2.05,alos:2,dx:['I21']}
+};
+const UPC={'194':'871','291':'871','392':'871','190':'871'}; // classic sepsis upcoding targets
